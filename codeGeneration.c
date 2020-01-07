@@ -596,6 +596,8 @@ void codeGenExprNode(AST_NODE *exprNode) {
       freeRegister(FLOAT_REG, rightOp->registerIndex);
     } else if (exprNode->dataType == INT_TYPE) {
       exprNode->registerIndex = leftOp->registerIndex;
+      int tmp_reg_index;
+
       switch (exprNode->semantic_value.exprSemanticValue.op.binaryOp) {
       case BINARY_OP_ADD:
         codeGen3RegInstruction(INT_REG, "addw", exprNode->registerIndex,
@@ -640,6 +642,7 @@ void codeGenExprNode(AST_NODE *exprNode) {
       case BINARY_OP_GT:
         codeGen3RegInstruction(INT_REG, "sgt", exprNode->registerIndex,
                                leftOp->registerIndex, rightOp->registerIndex);
+
         break;
       case BINARY_OP_LT:
         codeGen3RegInstruction(INT_REG, "slt", exprNode->registerIndex,
@@ -649,11 +652,95 @@ void codeGenExprNode(AST_NODE *exprNode) {
         codeGenLogicalInstruction(INT_REG, "and", exprNode->registerIndex,
                                   leftOp->registerIndex,
                                   rightOp->registerIndex);
+        int labelNumber_ = getLabelNumber();
+
+        int tmp_reg_index_ = getRegister(INT_REG);
+        char *tmp_reg_name_ = NULL;  
+        tmp_reg_name_ = intRegisterName_64[tmp_reg_index_]; 
+
+        int tmp_reg2_index_;
+        tmp_reg2_index_ = getRegister(INT_REG);
+        char *tmp_reg2_name_ = NULL;
+        tmp_reg2_name_ = intRegisterName_64[tmp_reg2_index_]; 
+
+        char *leftOpName_ = intRegisterName_64[leftOp->registerIndex];
+        char *rightOpName_ = intRegisterName_64[rightOp->registerIndex];   
+
+        /*todo: short  circuit*/
+        fprintf(g_codeGenOutputFp,"beqz %s, Then%d\n",leftOpName_, labelNumber_);
+
+        fprintf(g_codeGenOutputFp,"beqz %s, Then%d\n",rightOpName_, labelNumber_);
+
+        fprintf(g_codeGenOutputFp,"li %s, 1\n", leftOpName_);//the reg of false
+        fprintf(g_codeGenOutputFp,"j Exit%d\n", labelNumber_);
+
+        fprintf(g_codeGenOutputFp,"Then%d:\n", labelNumber_);
+        fprintf(g_codeGenOutputFp,"li %s, 0\n", leftOpName_);//the reg of true
+
+        fprintf(g_codeGenOutputFp,"Exit%d: \n",labelNumber_);
+
+        /*freeRegister(INT_REG, tmp_reg_index_);
+        freeRegister(INT_REG, tmp_reg2_index_);*/
+
         break;
       case BINARY_OP_OR:
-        codeGenLogicalInstruction(INT_REG, "or", exprNode->registerIndex,
+        /*codeGenLogicalInstruction(INT_REG, "or", exprNode->registerIndex,
                                   leftOp->registerIndex,
-                                  rightOp->registerIndex);
+                                  rightOp->registerIndex);*/
+        /*char *reg1Name = NULL;
+        codeGenPrepareRegister(processorType, reg1Index, 0, 0, &reg1Name);
+
+        char *reg2Name = NULL;
+        codeGenPrepareRegister(processorType, reg2Index, 1, 1, &reg2Name);
+
+        //fprintf(g_codeGenOutputFp, "%s %s, %s\n", instruction, reg1Name, reg2Name);
+
+        codeGenSaveToMemoryIfPsuedoRegister(processorType, reg1Index, reg1Name);*/
+        //get label number constant
+        //int labelNumber = getLabelNumber();
+        //char *rightOpRegName = NULL;
+        //int tmp_reg_index;
+        tmp_reg_index = getRegister(INT_REG);
+        char *tmp_reg_name = NULL;  
+        //codeGenPrepareRegister(INT_REG, tmp_reg_index, 0, 0, &tmp_reg_name);  
+        tmp_reg_name = intRegisterName_64[tmp_reg_index]; 
+
+        int tmp_reg2_index;
+        tmp_reg2_index = getRegister(INT_REG);
+        char *tmp_reg2_name = NULL;
+        //codeGenPrepareRegister(INT_REG, tmp_reg2_index, 1, 1, &tmp_reg2_name);
+        tmp_reg2_name = intRegisterName_64[tmp_reg2_index]; 
+
+        int labelNumber = getLabelNumber();
+
+        char *leftOpName = intRegisterName_64[leftOp->registerIndex];
+        char *rightOpName = intRegisterName_64[rightOp->registerIndex];   
+
+        /*SymbolAttribute *leftAttribute = leftOp->semantic_value.identifierSemanticValue
+                                     .symbolTableEntry->attribute;
+        SymbolAttribute *rightAttribute = rightOp->semantic_value.identifierSemanticValue
+                                     .symbolTableEntry->attribute;*/
+
+        /*todo: short  circuit*/
+        //fprintf(g_codeGenOutputFp, "li %s, fp, %d\n", leftOpName,leftOp->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->offsetInAR);
+        //printf("%d\n", leftOp->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->offsetInAR);
+        //fprintf(g_codeGenOutputFp, "addi %s, fp, %d\n", leftOpName, leftAttribute->offsetInAR);
+        //fprintf(g_codeGenOutputFp,"lw %s, 0(%s)\n",leftOpName, leftOpName);
+        fprintf(g_codeGenOutputFp,"bnez %s, Then%d\n",leftOpName, labelNumber);
+
+        //fprintf(g_codeGenOutputFp, "la %s, fp, %d\n", rightOpName,rightOp->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->offsetInAR);
+        //fprintf(g_codeGenOutputFp, "addi %s, fp, %d\n", rightOpName, rightAttribute->offsetInAR);
+        //fprintf(g_codeGenOutputFp,"lw %s, 0(%s)\n",rightOpName, rightOpName);
+        fprintf(g_codeGenOutputFp,"bnez %s, Then%d\n",rightOpName, labelNumber);
+
+        fprintf(g_codeGenOutputFp,"li %s, 0\n", leftOpName);//the reg of false
+        fprintf(g_codeGenOutputFp,"j Exit%d\n", labelNumber);
+
+        fprintf(g_codeGenOutputFp,"Then%d:\n", labelNumber);
+        fprintf(g_codeGenOutputFp,"li %s, 1\n", leftOpName);//the reg of true
+
+        fprintf(g_codeGenOutputFp,"Exit%d: \n",labelNumber);
+
         break;
       default:
         printf(
@@ -811,13 +898,14 @@ int codeGenCalcArrayElemenetAddress(AST_NODE *idNode) {
   codeGenExprRelatedNode(traverseDim);
   int linearIdxRegisterIndex = traverseDim->registerIndex;
   traverseDim = traverseDim->rightSibling;
-
+    
   int dimIndex = 1;
-  /*TODO multiple dimensions
+  /*TODO multiple dimensions*/
     while(traverseDim)
     {
+
     }
-   */
+   
 
   int shiftLeftTwoBits = 2;
   codeGen2Reg1ImmInstruction_64(INT_REG, "sll", linearIdxRegisterIndex,

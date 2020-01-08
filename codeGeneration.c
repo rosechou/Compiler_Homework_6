@@ -7,6 +7,26 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+#define node_type(node) node->nodeType
+#define data_type(node) node->dataType
+#define id_sym(node) node->semantic_value.identifierSemanticValue.symbolTableEntry
+#define id_name(node) node->semantic_value.identifierSemanticValue.identifierName
+#define id_kind(node) node->semantic_value.identifierSemanticValue.kind
+#define decl_kind(node) node->semantic_value.declSemanticValue.kind
+#define stmt_kind(node) node->semantic_value.stmtSemanticValue.kind
+#define expr_kind(node) node->semantic_value.exprSemanticValue.kind
+#define sym_typedesc(sym) sym->attribute->attr.typeDescriptor
+#define const_ival(node) node->semantic_value.const1->const_u.intval
+#define const_fval(node) node->semantic_value.const1->const_u.fval
+#define const_sval(node) node->semantic_value.const1->const_u.sc
+#define expr_const_eval(node) node->semantic_value.exprSemanticValue.isConstEval
+#define const_type(node) node->semantic_value.const1->const_type
+#define expr_bin_op(node) node->semantic_value.exprSemanticValue.op.binaryOp
+#define expr_uni_op(node) node->semantic_value.exprSemanticValue.op.unaryOp
+#define expr_eval(node) node->semantic_value.exprSemanticValue.constEvalValue
+
+
 FILE *g_codeGenOutputFp = NULL;
 char *g_currentFunctionName = NULL;
 
@@ -900,10 +920,30 @@ int codeGenCalcArrayElemenetAddress(AST_NODE *idNode) {
     
   int dimIndex = 1;
   /*TODO multiple dimensions*/
+  // char *offset_reg, *mul_reg, *expr_reg;
+  // int reg_index = getRegister(INT_REG);
+  // ArrayProperties array_prop = sym_typedesc(id_sym(idNode))->properties.arrayProperties;
+
+  // for (int dim = 1; dim < array_prop.dimension; dim++) {
+  //   codeGenPrepareRegister(INT_REG, linearIdxRegisterIndex, 1, 0, &offset_reg);
+  //   codeGenPrepareRegister(INT_REG, reg_index, 0, 1, &mul_reg);
+  //   fprintf(g_codeGenOutputFp, "addi %s, x0, %d\n", mul_reg, sizeInEachDimension[dim]);
+  //   fprintf(g_codeGenOutputFp, "mul %s, %s, %s\n", offset_reg, offset_reg, mul_reg);
+  //   if (traverseDim != NULL) {
+  //     codeGenExprRelatedNode(traverseDim);
+  //     codeGenPrepareRegister(INT_REG, traverseDim->registerIndex, 1, 1, &expr_reg);
+  //     fprintf(g_codeGenOutputFp, "add %s, %s, %s\n", offset_reg, offset_reg, expr_reg);
+  //     freeRegister(INT_REG, traverseDim->registerIndex);
+  //     traverseDim = traverseDim->rightSibling;
+  //   }
+  // }
   char* output = NULL;
+  int d = 0;
 
     while(traverseDim)
     {
+      int reg_index = getRegister(INT_REG);
+      int reg_index2 = getRegister(INT_REG);
       idNode->registerIndex = getRegister(INT_REG);
       AST_NODE* dim = idNode->child;
       dim->registerIndex = getRegister(INT_REG);
@@ -913,23 +953,32 @@ int codeGenCalcArrayElemenetAddress(AST_NODE *idNode) {
 
       char* dimRegName = NULL;
       char* dim_nextRegName = NULL;
+      char* mul_reg = NULL;
+      char* add_reg = NULL;
 
-      fprintf(g_codeGenOutputFp, "la %s, _g_%s\n", intWorkRegisterName_64[0],
-            idNode->semantic_value.identifierSemanticValue.identifierName);
+      /*fprintf(g_codeGenOutputFp, "la %s, _g_%s\n", intWorkRegisterName_64[0],
+            idNode->semantic_value.identifierSemanticValue.identifierName);*/
+      codeGenPrepareRegister(INT_REG, reg_index, 0, 1, &mul_reg);
+      fprintf(g_codeGenOutputFp, "addi %s, x0, %d\n", mul_reg, sizeInEachDimension[d]);
 
-      codeGenPrepareRegister_64(INT_REG, dim->registerIndex, 1, 1, &dimRegName);
-      fprintf(g_codeGenOutputFp, "mul %s, %s, %s\n", dimRegName, dimRegName, intWorkRegisterName_64[0]);
+      /*codeGenPrepareRegister(INT_REG, reg_index2, 0, 1, &add_reg);
+      fprintf(g_codeGenOutputFp, "addi %s, x1, %d\n",add_reg, sizeInEachDimension[d+1]);*/
 
-      codeGenPrepareRegister_64(INT_REG, dim_next->registerIndex, 1, 1, &dim_nextRegName);
+      codeGenPrepareRegister(INT_REG, dim->registerIndex, 1, 1, &dimRegName);
+      fprintf(g_codeGenOutputFp, "mul %s, %s, %s\n", dimRegName, dimRegName, mul_reg);
+
+      codeGenPrepareRegister(INT_REG, dim_next->registerIndex, 1, 1, &dim_nextRegName);
       fprintf(g_codeGenOutputFp,"add %s, %s, %s\n", dim_nextRegName, dim_nextRegName,intWorkRegisterName_64[0]);
 
       /*output*/
       output = dim_nextRegName;
+      traverseDim = traverseDim -> rightSibling;
+      d = d + 1;
 
     }
-    // lw 
+
+    /*lw*/ 
     fprintf(g_codeGenOutputFp, "lw %s, 0(%s)\n", output, output);
-   
 
   int shiftLeftTwoBits = 2;
   codeGen2Reg1ImmInstruction_64(INT_REG, "sll", linearIdxRegisterIndex,

@@ -274,8 +274,7 @@ void codeGenFPCmpInst(char *Inst, int Dist, int Op1, int Op2) {
   codeGenPrepareRegister(INT_REG, Dist, 0, 0, &DistName);
   codeGenPrepareRegister(FLOAT_REG, Op1, 1, 0, &Op1Name);
   codeGenPrepareRegister(FLOAT_REG, Op2, 1, 1, &Op2Name);
-  fprintf(g_codeGenOutputFp, "%s %s, %s, %s\n", Inst, DistName, Op1Name,
-          Op2Name);
+  fprintf(g_codeGenOutputFp, "%s %s, %s, %s\n", Inst, DistName, Op1Name, Op2Name);
   codeGenSaveToMemoryIfPsuedoRegister(FLOAT_REG, Op1, Op1Name);
 }
 
@@ -901,10 +900,35 @@ int codeGenCalcArrayElemenetAddress(AST_NODE *idNode) {
     
   int dimIndex = 1;
   /*TODO multiple dimensions*/
+  char* output = NULL;
+
     while(traverseDim)
     {
+      idNode->registerIndex = getRegister(INT_REG);
+      AST_NODE* dim = idNode->child;
+      dim->registerIndex = getRegister(INT_REG);
+
+      AST_NODE* dim_next = dim->rightSibling;
+      dim_next->registerIndex = getRegister(INT_REG);
+
+      char* dimRegName = NULL;
+      char* dim_nextRegName = NULL;
+
+      fprintf(g_codeGenOutputFp, "la %s, _g_%s\n", intWorkRegisterName_64[0],
+            idNode->semantic_value.identifierSemanticValue.identifierName);
+
+      codeGenPrepareRegister_64(INT_REG, dim->registerIndex, 1, 1, &dimRegName);
+      fprintf(g_codeGenOutputFp, "mul %s, %s, %s\n", dimRegName, dimRegName, intWorkRegisterName_64[0]);
+
+      codeGenPrepareRegister_64(INT_REG, dim_next->registerIndex, 1, 1, &dim_nextRegName);
+      fprintf(g_codeGenOutputFp,"add %s, %s, %s\n", dim_nextRegName, dim_nextRegName,intWorkRegisterName_64[0]);
+
+      /*output*/
+      output = dim_nextRegName;
 
     }
+    // lw 
+    fprintf(g_codeGenOutputFp, "lw %s, 0(%s)\n", output, output);
    
 
   int shiftLeftTwoBits = 2;

@@ -543,23 +543,113 @@ void codeGenBlockNode(AST_NODE *blockNode) {
   }
 }
 
-void codeGenExprNode(AST_NODE *exprNode) {
-  if (exprNode->semantic_value.exprSemanticValue.kind == BINARY_OPERATION) {
-    AST_NODE *leftOp = exprNode->child;
-    AST_NODE *rightOp = leftOp->rightSibling;
-    codeGenExprRelatedNode(leftOp);
-    codeGenExprRelatedNode(rightOp);
-    if (leftOp->dataType == FLOAT_TYPE || rightOp->dataType == FLOAT_TYPE) {
-      if (leftOp->dataType == INT_TYPE) {
-        leftOp->registerIndex =
-            codeGenConvertFromIntToFloat(leftOp->registerIndex);
-      }
-      if (rightOp->dataType == INT_TYPE) {
-        rightOp->registerIndex =
-            codeGenConvertFromIntToFloat(rightOp->registerIndex);
-      }
+//start Short-circuit boolean expressions
+void codeGenExprNode(AST_NODE* exprNode)
+{
+  if(exprNode->semantic_value.exprSemanticValue.kind == BINARY_OPERATION)
+  {
+    AST_NODE* leftOp = exprNode->child;
+    AST_NODE* rightOp = leftOp->rightSibling;
+    if (expr_bin_op(exprNode) == BINARY_OP_OR || expr_bin_op(exprNode) == BINARY_OP_AND) {
+      int labelNumber = getLabelNumber();
+      char *leftOpRegName, *rightOpRegName;
 
-      switch (exprNode->semantic_value.exprSemanticValue.op.binaryOp) {
+      if(leftOp->dataType == FLOAT_TYPE || rightOp->dataType == FLOAT_TYPE) {
+        char *exprRegName;
+        exprNode->registerIndex = getRegister(INT_REG);
+        codeGenPrepareRegister(INT_REG, exprNode->registerIndex, 0, 0, &exprRegName);
+        
+        if (expr_bin_op(exprNode) == BINARY_OP_AND) {
+          codeGenExprRelatedNode(leftOp);
+          if(leftOp->dataType == INT_TYPE)
+            leftOp->registerIndex = codeGenConvertFromIntToFloat(leftOp->registerIndex);
+          codeGenPrepareRegister(FLOAT_REG, leftOp->registerIndex, 1, 1, &leftOpRegName);
+          //fprintf(g_codeGenOutputFp, "fcmp %s, #0.0\n", leftOpRegName);
+          fprintf(g_codeGenOutputFp, "beqz %s,_booleanFalse%d\n", leftOpRegName, labelNumber);
+          codeGenExprRelatedNode(rightOp);
+          if(rightOp->dataType == INT_TYPE)
+            rightOp->registerIndex = codeGenConvertFromIntToFloat(rightOp->registerIndex);
+          codeGenPrepareRegister(FLOAT_REG, rightOp->registerIndex, 1, 1, &rightOpRegName);
+          //fprintf(g_codeGenOutputFp, "fcmp %s, #0.0\n", rightOpRegName);
+          fprintf(g_codeGenOutputFp, "beqz %s,_booleanFalse%d\n", rightOpRegName, labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanTrue%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", exprRegName, 1);
+          fprintf(g_codeGenOutputFp, "j _booleanExit%d\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanFalse%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", exprRegName, 0);
+          fprintf(g_codeGenOutputFp, "_booleanExit%d:\n", labelNumber);
+        } else {
+          codeGenExprRelatedNode(leftOp);
+          if(leftOp->dataType == INT_TYPE)
+            leftOp->registerIndex = codeGenConvertFromIntToFloat(leftOp->registerIndex);
+          codeGenPrepareRegister(FLOAT_REG, leftOp->registerIndex, 1, 1, &leftOpRegName);// need think for isAddr
+          //fprintf(g_codeGenOutputFp, "fcmp %s, #0.0\n", leftOpRegName);
+          fprintf(g_codeGenOutputFp, "bnez %s,_booleanTrue%d\n", leftOpRegName,labelNumber);
+          codeGenExprRelatedNode(rightOp);
+          if(rightOp->dataType == INT_TYPE)
+            rightOp->registerIndex = codeGenConvertFromIntToFloat(rightOp->registerIndex);
+          codeGenPrepareRegister(FLOAT_REG, rightOp->registerIndex, 1, 1, &rightOpRegName);// need think for isAddr
+          //fprintf(g_codeGenOutputFp, "fcmp %s, #0.0\n", rightOpRegName);
+          fprintf(g_codeGenOutputFp, "bnez %s,_booleanTrue%d\n", rightOpRegName, labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanFalse%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", exprRegName, 0);
+          fprintf(g_codeGenOutputFp, "j _booleanExit%d\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanTrue%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", exprRegName, 1);
+          fprintf(g_codeGenOutputFp, "_booleanExit%d:\n", labelNumber);
+        }
+        freeRegister(FLOAT_REG, leftOp->registerIndex);
+        freeRegister(FLOAT_REG, rightOp->registerIndex);
+      } else if (exprNode->dataType == INT_TYPE) {
+        if (expr_bin_op(exprNode) == BINARY_OP_AND) {
+          codeGenExprRelatedNode(leftOp);
+          codeGenPrepareRegister(INT_REG, leftOp->registerIndex, 1, 0, &leftOpRegName);
+          //fprintf(g_codeGenOutputFp, "cmp %s, #0\n", leftOpRegName);
+          fprintf(g_codeGenOutputFp, "beqz %s,_booleanFalse%d\n", leftOpRegName, labelNumber);
+          codeGenExprRelatedNode(rightOp);
+          codeGenPrepareRegister(INT_REG, rightOp->registerIndex, 1, 0, &rightOpRegName);
+          //fprintf(g_codeGenOutputFp, "cmp %s, #0\n", rightOpRegName);
+          fprintf(g_codeGenOutputFp, "beqz %s,_booleanFalse%d\n", rightOpRegName, labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanTrue%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", leftOpRegName, 1);
+          fprintf(g_codeGenOutputFp, "j _booleanExit%d\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanFalse%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", leftOpRegName, 0);
+          fprintf(g_codeGenOutputFp, "_booleanExit%d:\n", labelNumber);
+        } else {
+          codeGenExprRelatedNode(leftOp);
+          codeGenPrepareRegister(INT_REG, leftOp->registerIndex, 1, 0, &leftOpRegName);
+          //fprintf(g_codeGenOutputFp, "cmp %s, #0\n", leftOpRegName);
+          fprintf(g_codeGenOutputFp, "bnez %s,_booleanTrue%d\n", leftOpRegName,labelNumber);
+          codeGenExprRelatedNode(rightOp);
+          codeGenPrepareRegister(INT_REG, rightOp->registerIndex, 1, 0, &rightOpRegName);
+          //fprintf(g_codeGenOutputFp, "cmp %s, #0\n", rightOpRegName);
+          fprintf(g_codeGenOutputFp, "bnez %s,_booleanTrue%d\n", rightOpRegName, labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanFalse%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", leftOpRegName, 0);
+          fprintf(g_codeGenOutputFp, "j _booleanExit%d\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "_booleanTrue%d:\n", labelNumber);
+          fprintf(g_codeGenOutputFp, "li %s, %d\n", leftOpRegName, 1);
+          fprintf(g_codeGenOutputFp, "_booleanExit%d:\n", labelNumber);
+        }
+        exprNode->registerIndex = leftOp->registerIndex;
+        freeRegister(INT_REG, rightOp->registerIndex);
+      }
+    } else {
+      codeGenExprRelatedNode(leftOp);
+      codeGenExprRelatedNode(rightOp);
+      if(leftOp->dataType == FLOAT_TYPE || rightOp->dataType == FLOAT_TYPE)
+      {
+        if(leftOp->dataType == INT_TYPE)
+        {
+          leftOp->registerIndex = codeGenConvertFromIntToFloat(leftOp->registerIndex);
+        }
+        if(rightOp->dataType == INT_TYPE)
+        {
+          rightOp->registerIndex = codeGenConvertFromIntToFloat(rightOp->registerIndex);
+        }
+
+        switch (exprNode->semantic_value.exprSemanticValue.op.binaryOp) {
       case BINARY_OP_ADD:
         exprNode->registerIndex = leftOp->registerIndex;
         codeGen3RegInstruction(FLOAT_REG, "fadd.s", exprNode->registerIndex,
@@ -639,7 +729,7 @@ void codeGenExprNode(AST_NODE *exprNode) {
       }
 
       freeRegister(FLOAT_REG, rightOp->registerIndex);
-    } else if (exprNode->dataType == INT_TYPE) {
+     } else if (exprNode->dataType == INT_TYPE) {
       exprNode->registerIndex = leftOp->registerIndex;
       int tmp_reg_index;
 
@@ -697,92 +787,11 @@ void codeGenExprNode(AST_NODE *exprNode) {
         codeGenLogicalInstruction(INT_REG, "and", exprNode->registerIndex,
                                   leftOp->registerIndex,
                                   rightOp->registerIndex);
-        int labelNumber_ = getLabelNumber();
-
-        int tmp_reg_index_ = getRegister(INT_REG);
-        char *tmp_reg_name_ = NULL;  
-        tmp_reg_name_ = intRegisterName_64[tmp_reg_index_]; 
-
-        int tmp_reg2_index_;
-        tmp_reg2_index_ = getRegister(INT_REG);
-        char *tmp_reg2_name_ = NULL;
-        tmp_reg2_name_ = intRegisterName_64[tmp_reg2_index_]; 
-
-        char *leftOpName_ = intRegisterName_64[leftOp->registerIndex];
-        char *rightOpName_ = intRegisterName_64[rightOp->registerIndex];   
-
-        /*todo: short  circuit*/
-        fprintf(g_codeGenOutputFp,"beqz %s, Then%d\n",leftOpName_, labelNumber_);
-
-        fprintf(g_codeGenOutputFp,"beqz %s, Then%d\n",rightOpName_, labelNumber_);
-
-        fprintf(g_codeGenOutputFp,"li %s, 1\n", leftOpName_);//the reg of false
-        fprintf(g_codeGenOutputFp,"j Exit%d\n", labelNumber_);
-
-        fprintf(g_codeGenOutputFp,"Then%d:\n", labelNumber_);
-        fprintf(g_codeGenOutputFp,"li %s, 0\n", leftOpName_);//the reg of true
-
-        fprintf(g_codeGenOutputFp,"Exit%d: \n",labelNumber_);
-
-        /*freeRegister(INT_REG, tmp_reg_index_);
-        freeRegister(INT_REG, tmp_reg2_index_);*/
-
         break;
       case BINARY_OP_OR:
-        /*codeGenLogicalInstruction(INT_REG, "or", exprNode->registerIndex,
+        codeGenLogicalInstruction(INT_REG, "or", exprNode->registerIndex,
                                   leftOp->registerIndex,
-                                  rightOp->registerIndex);*/
-        /*char *reg1Name = NULL;
-        codeGenPrepareRegister(processorType, reg1Index, 0, 0, &reg1Name);
-        char *reg2Name = NULL;
-        codeGenPrepareRegister(processorType, reg2Index, 1, 1, &reg2Name);
-        //fprintf(g_codeGenOutputFp, "%s %s, %s\n", instruction, reg1Name, reg2Name);
-        codeGenSaveToMemoryIfPsuedoRegister(processorType, reg1Index, reg1Name);*/
-        //get label number constant
-        //int labelNumber = getLabelNumber();
-        //char *rightOpRegName = NULL;
-        //int tmp_reg_index;
-        tmp_reg_index = getRegister(INT_REG);
-        char *tmp_reg_name = NULL;  
-        //codeGenPrepareRegister(INT_REG, tmp_reg_index, 0, 0, &tmp_reg_name);  
-        tmp_reg_name = intRegisterName_64[tmp_reg_index]; 
-
-        int tmp_reg2_index;
-        tmp_reg2_index = getRegister(INT_REG);
-        char *tmp_reg2_name = NULL;
-        //codeGenPrepareRegister(INT_REG, tmp_reg2_index, 1, 1, &tmp_reg2_name);
-        tmp_reg2_name = intRegisterName_64[tmp_reg2_index]; 
-
-        int labelNumber = getLabelNumber();
-
-        char *leftOpName = intRegisterName_64[leftOp->registerIndex];
-        char *rightOpName = intRegisterName_64[rightOp->registerIndex];   
-
-        /*SymbolAttribute *leftAttribute = leftOp->semantic_value.identifierSemanticValue
-                                     .symbolTableEntry->attribute;
-        SymbolAttribute *rightAttribute = rightOp->semantic_value.identifierSemanticValue
-                                     .symbolTableEntry->attribute;*/
-
-        /*todo: short  circuit*/
-        //fprintf(g_codeGenOutputFp, "li %s, fp, %d\n", leftOpName,leftOp->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->offsetInAR);
-        //printf("%d\n", leftOp->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->offsetInAR);
-        //fprintf(g_codeGenOutputFp, "addi %s, fp, %d\n", leftOpName, leftAttribute->offsetInAR);
-        //fprintf(g_codeGenOutputFp,"lw %s, 0(%s)\n",leftOpName, leftOpName);
-        fprintf(g_codeGenOutputFp,"bnez %s, Then%d\n",leftOpName, labelNumber);
-
-        //fprintf(g_codeGenOutputFp, "la %s, fp, %d\n", rightOpName,rightOp->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->offsetInAR);
-        //fprintf(g_codeGenOutputFp, "addi %s, fp, %d\n", rightOpName, rightAttribute->offsetInAR);
-        //fprintf(g_codeGenOutputFp,"lw %s, 0(%s)\n",rightOpName, rightOpName);
-        fprintf(g_codeGenOutputFp,"bnez %s, Then%d\n",rightOpName, labelNumber);
-
-        fprintf(g_codeGenOutputFp,"li %s, 0\n", leftOpName);//the reg of false
-        fprintf(g_codeGenOutputFp,"j Exit%d\n", labelNumber);
-
-        fprintf(g_codeGenOutputFp,"Then%d:\n", labelNumber);
-        fprintf(g_codeGenOutputFp,"li %s, 1\n", leftOpName);//the reg of true
-
-        fprintf(g_codeGenOutputFp,"Exit%d: \n",labelNumber);
-
+                                  rightOp->registerIndex);
         break;
       default:
         printf(
@@ -793,7 +802,7 @@ void codeGenExprNode(AST_NODE *exprNode) {
       freeRegister(INT_REG, rightOp->registerIndex);
     }
   } // endif BINARY_OPERATION
-  else if (exprNode->semantic_value.exprSemanticValue.kind == UNARY_OPERATION) {
+  }else if (exprNode->semantic_value.exprSemanticValue.kind == UNARY_OPERATION) {
     int tmpZero = 0;
     AST_NODE *operand = exprNode->child;
     codeGenExprRelatedNode(operand);
@@ -840,6 +849,7 @@ void codeGenExprNode(AST_NODE *exprNode) {
     }
   }
 }
+//end Short-circuit boolean expressions
 
 void codeGenFunctionCall(AST_NODE *functionCallNode) {
   AST_NODE *functionIdNode = functionCallNode->child;
@@ -984,7 +994,7 @@ void codeGenStoreParam(AST_NODE *traverseParameter, Parameter* formalParameter)
 }
 //End Function parameters
 
-/*todo: Multiple dimensional arrays*/
+//start Multiple dimensional arrays
 int codeGenCalcArrayElemenetAddress(AST_NODE *idNode) {
   AST_NODE *traverseDim = idNode->child;
   int *sizeInEachDimension =
@@ -1016,6 +1026,9 @@ int codeGenCalcArrayElemenetAddress(AST_NODE *idNode) {
    }
 
    freeRegister(INT_REG, reg_index);
+
+//end Multiple dimensional arrays
+   
   // char* output = NULL;
   // int d = 0;
 

@@ -1389,62 +1389,98 @@ void codeGenWhileStmt(AST_NODE *whileStmtNode) {
   fprintf(g_codeGenOutputFp, "_whileExitLabel_%d:\n", labelNumber);
 }
 
-void codeGenForStmt(AST_NODE *forStmtNode) 
-{ 
-  /*TODO*/
-  AST_NODE* init = forStmtNode->child;
-  AST_NODE* cond = init->rightSibling;
-  AST_NODE* loop = cond->rightSibling;
-  AST_NODE* block = loop->rightSibling;  
-  AST_NODE* try = (cond->child)->child;
+// void codeGenForStmt(AST_NODE *forStmtNode) 
+// { 
+//   /*TODO*/
+//   AST_NODE* init = forStmtNode->child;
+//   AST_NODE* cond = init->rightSibling;
+//   AST_NODE* loop = cond->rightSibling;
+//   AST_NODE* block = loop->rightSibling;  
+//   AST_NODE* try = (cond->child)->child;
 
-  int constantZeroLabelNumber = -1;
-  if (init->dataType == FLOAT_TYPE) {
-    float zero = 0.0f;
-    constantZeroLabelNumber = codeGenConstantLabel(FLOATC, &zero);
-  }
+//   int constantZeroLabelNumber = -1;
+//   if (init->dataType == FLOAT_TYPE) {
+//     float zero = 0.0f;
+//     constantZeroLabelNumber = codeGenConstantLabel(FLOATC, &zero);
+//   }
 
-  int labelNumber = getLabelNumber();
-  /*li sw*/
-  AST_NODE* leftOp=(init->child)->child;
-  char *rightOpRegName = NULL;
-  int tmp_reg_index = getRegister(INT_REG);
-  char *tmp_reg_name = intRegisterName_64[tmp_reg_index];
-  fprintf(g_codeGenOutputFp, "li %s, %d\n", tmp_reg_name,leftOp->semantic_value.identifierSemanticValue.symbolTableEntry
-                    ->attribute->offsetInAR);
-  freeRegister(INT_REG, tmp_reg_index);
+//   int labelNumber = getLabelNumber();
+//   /*li sw*/
+//   AST_NODE* leftOp=(init->child)->child;
+//   char *rightOpRegName = NULL;
+//   int tmp_reg_index = getRegister(INT_REG);
+//   char *tmp_reg_name = intRegisterName_64[tmp_reg_index];
+//   fprintf(g_codeGenOutputFp, "li %s, %d\n", tmp_reg_name,leftOp->semantic_value.identifierSemanticValue.symbolTableEntry
+//                     ->attribute->offsetInAR);
+//   freeRegister(INT_REG, tmp_reg_index);
 
-  fprintf(g_codeGenOutputFp, "_forTestLabel_%d:\n", labelNumber);
+//   fprintf(g_codeGenOutputFp, "_forTestLabel_%d:\n", labelNumber);
 
-  codeGenExprNode(cond->child);
+//   codeGenExprNode(cond->child);
 
-  if (try->dataType == INT_TYPE) {
-    //printf("%s\n","hello");
-    char *condRegName = NULL;
-    codeGenPrepareRegister(INT_REG, cond->registerIndex, 1, 0,&condRegName);
-    //printf("%s\n",condRegName);
-    //fprintf(g_codeGenOutputFp, "slt %s, %s, %s\n", condRegName, condRegName);
-    fprintf(g_codeGenOutputFp, "beqz %s,_forExitLabel_%d\n", condRegName, labelNumber);
-    //freeRegister(INT_REG, cond->registerIndex);
-  }else if(try->dataType == FLOAT_TYPE)/*not done*/
-  {
-    //printf("%s\n","hello2");
-    char *condRegName = NULL;
-    codeGenPrepareRegister(FLOAT_REG, cond->registerIndex, 1, 0,&condRegName);
-    fprintf(g_codeGenOutputFp, "beqz %s,_forExitLabel_%d\n", condRegName, labelNumber);
-    freeRegister(INT_REG, init->registerIndex);
-  }
+//   if (try->dataType == INT_TYPE) {
+//     //printf("%s\n","hello");
+//     char *condRegName = NULL;
+//     codeGenPrepareRegister(INT_REG, cond->registerIndex, 1, 0,&condRegName);
+//     //printf("%s\n",condRegName);
+//     //fprintf(g_codeGenOutputFp, "slt %s, %s, %s\n", condRegName, condRegName);
+//     fprintf(g_codeGenOutputFp, "beqz %s,_forExitLabel_%d\n", condRegName, labelNumber);
+//     //freeRegister(INT_REG, cond->registerIndex);
+//   }else if(try->dataType == FLOAT_TYPE)/*not done*/
+//   {
+//     //printf("%s\n","hello2");
+//     char *condRegName = NULL;
+//     codeGenPrepareRegister(FLOAT_REG, cond->registerIndex, 1, 0,&condRegName);
+//     fprintf(g_codeGenOutputFp, "beqz %s,_forExitLabel_%d\n", condRegName, labelNumber);
+//     //freeRegister(INT_REG, init->registerIndex);
+//   }
 
-  fprintf(g_codeGenOutputFp, "j _forBodyLabel_%d\n", labelNumber);
+//   fprintf(g_codeGenOutputFp, "j _forBodyLabel_%d\n", labelNumber);
 
-  fprintf(g_codeGenOutputFp, "_forIncLabel_%d:\n", labelNumber);
-  codeGenAssignmentStmt(loop->child);
-  fprintf(g_codeGenOutputFp, "j _forTestLabel_%d\n", labelNumber);
+//   fprintf(g_codeGenOutputFp, "_forIncLabel_%d:\n", labelNumber);
+//   codeGenAssignmentStmt(loop->child);
+//   fprintf(g_codeGenOutputFp, "j _forTestLabel_%d\n", labelNumber);
 
-  fprintf(g_codeGenOutputFp, "_forBodyLabel_%d:\n", labelNumber);
-  codeGenStmtNode(block);
-  fprintf(g_codeGenOutputFp, "j _forIncLabel_%d\n", labelNumber);
+//   fprintf(g_codeGenOutputFp, "_forBodyLabel_%d:\n", labelNumber);
+//   codeGenStmtNode(block);
+//   fprintf(g_codeGenOutputFp, "j _forIncLabel_%d\n", labelNumber);
   
+//   fprintf(g_codeGenOutputFp, "_forExitLabel_%d:\n", labelNumber);
+// }
+
+void codeGenForStmt(AST_NODE* forStmtNode)
+{
+  AST_NODE *initNode = forStmtNode->child;
+
+  // int constantZeroLabelNumber = -1;
+  // if (initNode->dataType == FLOAT_TYPE) {
+  //   float zero = 0.0f;
+  //   constantZeroLabelNumber = codeGenConstantLabel(FLOATC, &zero);
+  // }
+  codeGenGeneralNode(initNode);
+
+  AST_NODE *testNode = initNode->rightSibling;
+  int labelNumber = getLabelNumber();
+  fprintf(g_codeGenOutputFp, "_forTestLabel_%d:\n", labelNumber);
+  codeGenGeneralNode(testNode);
+  char* boolRegName = NULL;
+  codeGenPrepareRegister(INT_REG, testNode->registerIndex, 1, 0, &boolRegName);
+  //fprintf(g_codeGenOutputFp, "cmp %s, #0\n", boolRegName);
+  //fprintf(g_codeGenOutputFp, "jal %s, #0\n", boolRegName);
+  //fprintf(g_codeGenOutputFp, "beqz _forExitLabel_%d\n", labelNumber);
+  fprintf(g_codeGenOutputFp, "beqz %s,_forExitLabel_%d\n", boolRegName, labelNumber);
+  freeRegister(INT_REG, testNode->registerIndex);
+  
+  AST_NODE *incNode = testNode->rightSibling;
+  fprintf(g_codeGenOutputFp, "j _forBodyLabel_%d\n", labelNumber);
+  fprintf(g_codeGenOutputFp, "_forIncLabel_%d:\n", labelNumber);
+  codeGenGeneralNode(incNode);
+  fprintf(g_codeGenOutputFp, "j _forTestLabel_%d\n", labelNumber);
+  fprintf(g_codeGenOutputFp, "_forBodyLabel_%d:\n", labelNumber);
+
+  AST_NODE *bodyNode = incNode->rightSibling;
+  codeGenStmtNode(bodyNode);
+  fprintf(g_codeGenOutputFp, "j _forIncLabel_%d\n", labelNumber);
   fprintf(g_codeGenOutputFp, "_forExitLabel_%d:\n", labelNumber);
 }
 
@@ -1574,6 +1610,7 @@ void codeGenStmtNode(AST_NODE *stmtNode) {
 
 void codeGenGeneralNode(AST_NODE *node) {
   AST_NODE *traverseChildren = node->child;
+  int tmp; //modify
   switch (node->nodeType) {
   case VARIABLE_DECL_LIST_NODE:
     //Variable init
@@ -1590,20 +1627,49 @@ void codeGenGeneralNode(AST_NODE *node) {
       traverseChildren = traverseChildren->rightSibling;
     }
     break;
-  case NONEMPTY_ASSIGN_EXPR_LIST_NODE:
-    while (traverseChildren) {
-      codeGenAssignOrExpr(traverseChildren);
-      if (traverseChildren->rightSibling) {
-        if (traverseChildren->dataType == INT_TYPE) {
-          freeRegister(INT_REG, traverseChildren->registerIndex);
-        } else if (traverseChildren->dataType == FLOAT_TYPE) {
-          freeRegister(FLOAT_REG, traverseChildren->registerIndex);
+  // case NONEMPTY_ASSIGN_EXPR_LIST_NODE:
+  //   while (traverseChildren) {
+  //     codeGenAssignOrExpr(traverseChildren);
+  //     if (traverseChildren->rightSibling) {
+  //       if (traverseChildren->dataType == INT_TYPE) {
+  //         freeRegister(INT_REG, traverseChildren->registerIndex);
+  //       } else if (traverseChildren->dataType == FLOAT_TYPE) {
+  //         freeRegister(FLOAT_REG, traverseChildren->registerIndex);
+  //       }
+  //     }
+  //     traverseChildren = traverseChildren->rightSibling;
+  //   }
+  //   node->registerIndex = traverseChildren->registerIndex;
+  //   break;
+  // case NONEMPTY_RELOP_EXPR_LIST_NODE:
+  //   while (traverseChildren) {
+  //     codeGenExprRelatedNode(traverseChildren);
+  //     if (traverseChildren->rightSibling) {
+  //       if (traverseChildren->dataType == INT_TYPE) {
+  //         freeRegister(INT_REG, traverseChildren->registerIndex);
+  //       } else if (traverseChildren->dataType == FLOAT_TYPE) {
+  //         freeRegister(FLOAT_REG, traverseChildren->registerIndex);
+  //       }
+  //     }
+  //     traverseChildren = traverseChildren->rightSibling;
+  //   }
+  //   node->registerIndex = traverseChildren->registerIndex;
+  //   break;
+    case NONEMPTY_ASSIGN_EXPR_LIST_NODE:  
+      while (traverseChildren) {
+        codeGenAssignOrExpr(traverseChildren);
+        if (traverseChildren->rightSibling) {
+          if (traverseChildren->dataType == INT_TYPE) {
+            freeRegister(INT_REG, traverseChildren->registerIndex);
+          } else if (traverseChildren->dataType == FLOAT_TYPE) {
+            freeRegister(FLOAT_REG, traverseChildren->registerIndex);
+          }
         }
+        tmp = traverseChildren->registerIndex;
+        traverseChildren = traverseChildren->rightSibling;
       }
-      traverseChildren = traverseChildren->rightSibling;
-    }
-    node->registerIndex = traverseChildren->registerIndex;
-    break;
+      node->registerIndex = tmp;//traverseChildren->registerIndex;
+      break;
   case NONEMPTY_RELOP_EXPR_LIST_NODE:
     while (traverseChildren) {
       codeGenExprRelatedNode(traverseChildren);
@@ -1614,9 +1680,10 @@ void codeGenGeneralNode(AST_NODE *node) {
           freeRegister(FLOAT_REG, traverseChildren->registerIndex);
         }
       }
+      tmp = traverseChildren->registerIndex;
       traverseChildren = traverseChildren->rightSibling;
     }
-    node->registerIndex = traverseChildren->registerIndex;
+    node->registerIndex = tmp;//traverseChildren->registerIndex;
     break;
   case NUL_NODE:
     break;

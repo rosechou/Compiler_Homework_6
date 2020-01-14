@@ -488,6 +488,14 @@ void codeGenFunctionDeclaration(AST_NODE *functionDeclNode) {
   fprintf(g_codeGenOutputFp, "sub sp,sp,ra\n");
   printStoreRegister(g_codeGenOutputFp);
 
+  /*START: Implicit type conversions*/
+  if (strcmp( functionIdNode->semantic_value.identifierSemanticValue.identifierName,
+          "MAIN") == 0) {
+        fprintf(g_codeGenOutputFp, "li s1, 1\n");
+        fprintf(g_codeGenOutputFp, "fsrm s1\n");
+  } 
+  /*END: Implicit type conversions*/
+
   resetRegisterTable(functionIdNode->semantic_value.identifierSemanticValue
                          .symbolTableEntry->attribute->offsetInAR);
 
@@ -1020,10 +1028,16 @@ int codeGenCalcArrayElemenetAddress(AST_NODE *idNode) {
       codeGenExprRelatedNode(traverseDim);
       codeGenPrepareRegister(INT_REG, traverseDim->registerIndex, 1, 1, &expr_reg);
       fprintf(g_codeGenOutputFp, "add %s, %s, %s\n", offset_reg, offset_reg, expr_reg);
+      
       freeRegister(INT_REG, traverseDim->registerIndex);
-      traverseDim = traverseDim->rightSibling;
+      traverseDim = traverseDim->rightSibling;  
     }
+
+
    }
+   fprintf(g_codeGenOutputFp, "lw %s, 0(%s)\n", offset_reg, expr_reg);
+      
+      
 
    freeRegister(INT_REG, reg_index);
 
